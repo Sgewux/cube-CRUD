@@ -7,7 +7,7 @@ Base = declarative_base()
 class Cube(Base):
     __tablename__ = 'cubes'
     sn = Column(String(255), primary_key=True)
-    name = Column(String(20), primary_key=True)
+    name = Column(String(20))
     brand = Column(String(20))
     category = Column(Enum('speed', 'collection'))
     difficulty = Column(Enum('easy','not too easy', 'hard'))
