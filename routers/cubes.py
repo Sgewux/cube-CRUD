@@ -6,11 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter, Path, Query, Body, Response, HTTPException
 
 from dbmodels.cube import Cube
-from models.cube import CubeIn, CubeOut, _Difficulty, _Category
+from models.cube import CubeIn, CubeOut, BaseCube, _Difficulty, _Category
 from config.db import session
 
 
-router = APIRouter()
+router = APIRouter(tags=['Cubes'])
 
 
 @router.get('/cubes', response_model=List[CubeOut])
@@ -30,6 +30,26 @@ def get_all_cubes(
         None
     )
 ):
+    '''
+    **Get all cubes**
+
+    This function allows the user to get data of all cubes stored in
+    the database. It also allows filtering data
+    through some query parameters.
+
+    **price_lt:** Integer value to return only the cubes that have
+              a lower price than it.
+
+    **price_gt:** Integer value to return only the cubes that have   
+              a higher price than it.
+
+    **difficulty:** A difficulty category to search for.
+
+    **category:** A cube category to search for.
+
+    **Returns:**
+            A list of CubeOut json schemas.
+    '''
     if price_lt and price_gt:
         results = session.query(Cube).filter(
             Cube.price < price_lt,
@@ -94,6 +114,7 @@ def add_cube(cube: CubeIn = Body(...)):
         session.add(new_cube)
         session.commit()
     except IntegrityError as e:
+        session.rollback()  # Once a transacction fails must be rolled back in order to preserve db's integrity.
         if 'psycopg2.errors.UniqueViolation' in str(e):
             raise HTTPException(status_code=400, detail='Name must be unique!')
     
@@ -102,16 +123,66 @@ def add_cube(cube: CubeIn = Body(...)):
 
     return cube
     
-@router.get('/cubes/{cube_id}')
-def get_cube():
-    pass
 
-@router.put('/cubes/{cube_id}')
-def update_cube():
-    pass
+@router.get('/cubes/{cube_sn}', response_model=CubeOut)
+def get_cube(cube_sn: str = Path(...)):
+    result = session.query(Cube).filter(Cube.sn == cube_sn).first()
+    
+    if result is None:
+        raise HTTPException(status_code=404, detail='Unexistent cube!')
 
-@router.delete('/cubes/{cube_id}')
-def delete_cube():
-    pass
+    cube = CubeOut(
+        SN=result.sn,
+        Name=result.name,
+        Category=result.category,
+        NumOfPieces=result.numofpieces,
+        Brand=result.brand,
+        Difficulty=result.difficulty,
+        Review=result.review,
+        Price=result.price
+    )
+
+    return cube
 
 
+@router.put(
+    '/cubes/{cube_sn}',
+    status_code=200,
+    response_model=CubeOut
+)
+def update_cube(
+    cube_sn: str = Path(...),
+    new_cube: BaseCube = Body(...)  # BaseCube as rquestbody because i dont want the user to set a new cube name.
+):
+    result = session.query(Cube).filter(Cube.sn == cube_sn)
+    if result.first() is None:
+        raise HTTPException(status_code=404, detail='Could not update an unexistent cube!')
+    
+    result.update({
+        Cube.category: str(new_cube.Category).rpartition('.')[2],
+        Cube.brand: new_cube.Brand,
+        Cube.numofpieces: new_cube.NumOfPieces,
+        Cube.difficulty: str(new_cube.Difficulty).rpartition('.')[2].\
+        replace('_', ' '),
+        Cube.review: new_cube.Review,
+        Cube.price: new_cube.Price
+    })
+    session.commit()
+    new_cube = dict(new_cube)
+    new_cube = new_cube | {'SN': result.first().sn, 'Name': result.first().name}
+
+    return new_cube
+
+
+@router.delete(
+    '/cubes/{cube_sn}', 
+    status_code=204,
+    response_class=Response  # I had to set this cause fastapi was converting None to null and returning a > 0 content lenght.
+)
+def delete_cube(cube_sn: str = Path(...)):
+    result = session.query(Cube).filter(Cube.sn == cube_sn)
+    if result.first() is None:
+        raise HTTPException(status_code=404, detail='Could not delete an unexsisten cube!')
+    
+    result.delete()
+    session.commit()
