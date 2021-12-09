@@ -4,7 +4,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-#Enums
+# Enums
+
+
 class _Category(Enum):
     speed = 'speed'
     collection = 'collection'
@@ -12,7 +14,7 @@ class _Category(Enum):
 
 class _Difficulty(Enum):
     easy = 'easy'
-    not_too_easy= 'not too easy'
+    not_too_easy = 'not too easy'
     hard = 'hard'
 
 
@@ -32,5 +34,4 @@ class CubeIn(BaseCube):
 
 class CubeOut(BaseCube):
     Name: str = Field(..., max_length=20)
-    SN: str 
-
+    SN: str

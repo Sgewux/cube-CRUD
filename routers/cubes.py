@@ -40,7 +40,7 @@ def get_all_cubes(
     **price_lt:** Integer value to return only the cubes that have
               a lower price than it.
 
-    **price_gt:** Integer value to return only the cubes that have   
+    **price_gt:** Integer value to return only the cubes that have
               a higher price than it.
 
     **difficulty:** A difficulty category to search for.
@@ -69,7 +69,7 @@ def get_all_cubes(
         ).all()
     elif difficulty:
         results = session.query(Cube).filter(
-            Cube.difficulty == str(difficulty).rpartition('.')[2].replace('_',' ')
+            Cube.difficulty == str(difficulty).rpartition('.')[2].replace('_', ' ')
         ).all()
     else:
         results = session.query(Cube).all()
@@ -93,12 +93,21 @@ def get_all_cubes(
 
 
 @router.post(
-    '/cubes/add', 
-    status_code=201, 
+    '/cubes/add',
+    status_code=201,
     response_model=CubeOut,
     response_model_exclude_unset=True
 )
 def add_cube(cube: CubeIn = Body(...)):
+    '''
+    **Add Cube**
+    
+    This function allows the user to add a new cube to the database.
+
+    **Cube:** A CubeIn json schema as request body, with the new cube's data.
+
+    **Returns:** A CubeOut json schema.
+    '''
     new_cube = Cube(
         sn=uuid.uuid1().hex,
         name=cube.Name,
@@ -109,7 +118,7 @@ def add_cube(cube: CubeIn = Body(...)):
         review=cube.Review,
         price=cube.Price
     )
-    
+
     try:
         session.add(new_cube)
         session.commit()
@@ -117,17 +126,30 @@ def add_cube(cube: CubeIn = Body(...)):
         session.rollback()  # Once a transacction fails must be rolled back in order to preserve db's integrity.
         if 'psycopg2.errors.UniqueViolation' in str(e):
             raise HTTPException(status_code=400, detail='Name must be unique!')
-    
+
     cube = dict(cube)
     cube['SN'] = new_cube.sn
 
     return cube
-    
 
-@router.get('/cubes/{cube_sn}', response_model=CubeOut)
+
+@router.get(
+    '/cubes/{cube_sn}',
+    status_code=200,
+    response_model=CubeOut)
 def get_cube(cube_sn: str = Path(...)):
+    '''
+    **Get Cube**
+
+    This function allows the user to get data of a specific cube
+    identifying it with the serial number.
+
+    **cube_sn:** A str with the sn of the cube as a path parameter.
+
+    **Returns:** A CubeOut json schema.
+    '''
     result = session.query(Cube).filter(Cube.sn == cube_sn).first()
-    
+
     if result is None:
         raise HTTPException(status_code=404, detail='Unexistent cube!')
 
@@ -154,10 +176,24 @@ def update_cube(
     cube_sn: str = Path(...),
     new_cube: BaseCube = Body(...)  # BaseCube as rquestbody because i dont want the user to set a new cube name.
 ):
+    '''
+    Update Cube
+
+    This function allows the user to perform an update operation
+    with this function the user can edit all cube's informartion (except name).
+
+    **cube_sn:** str with the sn to the cube you want to update.
+    **new_cube:** json schema with the new information of the cube.
+    
+    **Returns:** a CubeOut json schema.
+    '''
     result = session.query(Cube).filter(Cube.sn == cube_sn)
     if result.first() is None:
-        raise HTTPException(status_code=404, detail='Could not update an unexistent cube!')
-    
+        raise HTTPException(
+            status_code=404,
+            detail='Could not update an unexistent cube!'
+        )
+
     result.update({
         Cube.category: str(new_cube.Category).rpartition('.')[2],
         Cube.brand: new_cube.Brand,
@@ -175,14 +211,26 @@ def update_cube(
 
 
 @router.delete(
-    '/cubes/{cube_sn}', 
+    '/cubes/{cube_sn}',
     status_code=204,
     response_class=Response  # I had to set this cause fastapi was converting None to null and returning a > 0 content lenght.
 )
 def delete_cube(cube_sn: str = Path(...)):
+    '''
+    Delete Cube
+
+    This function allows the user to delete a cube record from the database.
+
+    **cube_sn:** str with the sn of the cube you want to delete.
+
+    **Returns:** 204 NO CONTENT.
+    '''
     result = session.query(Cube).filter(Cube.sn == cube_sn)
     if result.first() is None:
-        raise HTTPException(status_code=404, detail='Could not delete an unexsisten cube!')
-    
+        raise HTTPException(
+            status_code=404,
+            detail='Could not delete an unexsisten cube!'
+        )
+
     result.delete()
     session.commit()
