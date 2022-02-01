@@ -148,7 +148,7 @@ def get_cube(cube_sn: str = Path(...)):
 
     **Returns:** A CubeOut json schema.
     '''
-    result = session.query(Cube).filter(Cube.sn == cube_sn).first()
+    result = session.get(Cube, cube_sn)
 
     if result is None:
         raise HTTPException(status_code=404, detail='Unexistent cube!')
